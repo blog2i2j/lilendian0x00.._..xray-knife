@@ -8,9 +8,17 @@ import (
 var SubsCmd = &cobra.Command{
 	Use:   "subs",
 	Short: "Fetch and manage proxy configurations from subscription links.",
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
+	Long: `Manage proxy subscription links and their fetched configurations.
+
+Subcommands allow you to add, remove, update, fetch, and inspect subscriptions
+and the proxy configs they contain.
+
+Examples:
+  xray-knife subs add --url "https://example.com/sub" --remark "My VPN"
+  xray-knife subs show
+  xray-knife subs fetch --id 1
+  xray-knife subs fetch --all
+  xray-knife subs list-configs --id 1`,
 }
 
 func addSubcommandPalettes() {
@@ -18,6 +26,8 @@ func addSubcommandPalettes() {
 	SubsCmd.AddCommand(NewFetchCommand())
 	SubsCmd.AddCommand(AddCmd)
 	SubsCmd.AddCommand(RmCmd)
+	SubsCmd.AddCommand(UpdateCmd)
+	SubsCmd.AddCommand(ListConfigsCmd)
 }
 
 func init() {

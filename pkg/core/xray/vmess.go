@@ -26,6 +26,9 @@ func (v *Vmess) Name() string {
 }
 
 func method1(v *Vmess, link string) error {
+	if len(link) <= 8 {
+		return fmt.Errorf("vmess link too short: %s", link)
+	}
 	b64encoded := link[8:]
 	decoded, err := utils.Base64Decode(b64encoded)
 	if err != nil {

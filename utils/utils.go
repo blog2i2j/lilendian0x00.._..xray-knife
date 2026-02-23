@@ -34,6 +34,8 @@ func ParseFileByNewline(fileName string) []string {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	// Increase buffer to 1MB to handle very long config lines (e.g. vmess base64 blobs)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 
 	// Set the Scanner to split on newline characters
 	scanner.Split(bufio.ScanLines)

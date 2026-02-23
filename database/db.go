@@ -22,8 +22,11 @@ var DB *sqlx.DB
 
 // InitDB opens the SQLite connection, runs migrations, and sets the global DB.
 func InitDB(dbPath string) error {
-	// The `_pragma=foreign_keys(1)` is crucial for enforcing data integrity.
-	db, err := sqlx.Open("sqlite", dbPath+"?_pragma=foreign_keys(1)")
+	// The `_pragma` params enable:
+	// - foreign_keys: enforce data integrity
+	// - busy_timeout: wait up to 5s instead of failing immediately on lock contention
+	// - journal_mode=WAL: allow concurrent reads during writes
+	db, err := sqlx.Open("sqlite", dbPath+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}

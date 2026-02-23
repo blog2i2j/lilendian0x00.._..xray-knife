@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -69,7 +70,9 @@ type CfScanResult struct {
 
 func AddSubscription(url, remark, userAgent string) error {
 	query := `INSERT INTO subscriptions (url, remark, user_agent) VALUES (?, ?, ?)`
-	_, err := DB.ExecContext(context.Background(), query, url, remark, userAgent)
+	remarkNull := sql.NullString{String: remark, Valid: remark != ""}
+	uaNull := sql.NullString{String: userAgent, Valid: userAgent != ""}
+	_, err := DB.ExecContext(context.Background(), query, url, remarkNull, uaNull)
 	if err != nil {
 		return fmt.Errorf("could not add subscription: %w", err)
 	}
@@ -119,6 +122,101 @@ func UpdateSubscriptionFetched(id int64, fetchTime time.Time) error {
 	query := `UPDATE subscriptions SET last_fetched_at = ? WHERE id = ?`
 	_, err := DB.ExecContext(context.Background(), query, fetchTime, id)
 	return err
+}
+
+func UpdateSubscription(id int64, urlVal, remark, userAgent *string, enabled *bool) error {
+	setClauses := []string{}
+	args := []interface{}{}
+
+	if urlVal != nil {
+		setClauses = append(setClauses, "url = ?")
+		args = append(args, *urlVal)
+	}
+	if remark != nil {
+		setClauses = append(setClauses, "remark = ?")
+		if *remark == "" {
+			args = append(args, sql.NullString{})
+		} else {
+			args = append(args, *remark)
+		}
+	}
+	if userAgent != nil {
+		setClauses = append(setClauses, "user_agent = ?")
+		if *userAgent == "" {
+			args = append(args, sql.NullString{})
+		} else {
+			args = append(args, *userAgent)
+		}
+	}
+	if enabled != nil {
+		setClauses = append(setClauses, "enabled = ?")
+		args = append(args, *enabled)
+	}
+
+	if len(setClauses) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE subscriptions SET %s WHERE id = ?", strings.Join(setClauses, ", "))
+	args = append(args, id)
+
+	res, err := DB.ExecContext(context.Background(), query, args...)
+	if err != nil {
+		return fmt.Errorf("could not update subscription %d: %w", id, err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no subscription found with id %d", id)
+	}
+	return nil
+}
+
+func ListSubscriptionConfigs(subID int64, protocol string, limit int) ([]SubscriptionConfig, error) {
+	query := `SELECT id, subscription_id, config_link, protocol, remark, added_at, last_seen_at FROM subscription_configs WHERE 1=1`
+	args := []interface{}{}
+
+	if subID > 0 {
+		query += " AND subscription_id = ?"
+		args = append(args, subID)
+	}
+	if protocol != "" {
+		query += " AND protocol = ?"
+		args = append(args, protocol)
+	}
+
+	query += " ORDER BY last_seen_at DESC"
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	var configs []SubscriptionConfig
+	err := DB.SelectContext(context.Background(), &configs, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("could not list subscription configs: %w", err)
+	}
+	return configs, nil
+}
+
+func CountSubscriptionConfigs(subID int64) (int, error) {
+	query := `SELECT COUNT(*) FROM subscription_configs WHERE 1=1`
+	args := []interface{}{}
+
+	if subID > 0 {
+		query += " AND subscription_id = ?"
+		args = append(args, subID)
+	}
+
+	var count int
+	err := DB.GetContext(context.Background(), &count, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("could not count subscription configs: %w", err)
+	}
+	return count, nil
 }
 
 // Subscription Configs
